@@ -1,5 +1,6 @@
-import pickle
+import sys
 import json
+import pickle
 from datetime import datetime
 from collections import defaultdict
 
@@ -10,8 +11,8 @@ import gensim.downloader as api
 
 from processing import normalize_text
 
-data_file = 'unlabeled.csv'
-
+data_file_path = sys.argv[1]
+model_file_path = sys.argv[2]
 word2vec = api.load('word2vec-google-news-300')
 
 def w2v(w):
@@ -24,7 +25,7 @@ def w2v(w):
 
 if __name__ == '__main__':
     print('Generating snippets...')
-    data = pd.read_csv(data_file, usecols=['id', 'text'])
+    data = pd.read_csv(data_file_path, usecols=['id', 'text'])
     data['normalized'] = data.text.apply(lambda x: normalize_text(str(x)))
     data = data.explode('normalized')
     data.rename(columns={'normalized': 'token'}, inplace=True)
@@ -34,7 +35,7 @@ if __name__ == '__main__':
     data.dropna(subset=['word_vec'], inplace=True)
     data.reset_index(drop=True, inplace=True)
 
-    with open('model_temp.sklearn', 'rb') as model_file:
+    with open(model_file_path, 'rb') as model_file:
         regr = pickle.load(model_file)
 
     data['score'] = data.word_vec.apply(lambda _v: float(regr.predict(_v.reshape(1,-1))))
