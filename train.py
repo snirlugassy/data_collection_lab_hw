@@ -1,5 +1,7 @@
 import pickle
 import sys
+import string
+from datetime import datetime
 from collections import defaultdict
 
 import pandas as pd
@@ -7,7 +9,7 @@ import numpy as np
 from sklearn.neural_network import MLPRegressor
 import gensim.downloader as api
 
-from processing import normalize_text
+from processing import normalize_text_series
 
 labeled_data = sys.argv[1]
 model_file_name = 'model.sklearn'
@@ -49,10 +51,10 @@ def w2v(w):
 
 if __name__ == '__main__':
     print(f'Reading CSV file {labeled_data}')
-    raw = pd.read_csv(labeled_data, usecols=['text', 'industry'])
+    raw = pd.read_csv(labeled_data, usecols=['text', 'industry'], dtype={'text': str, 'industry':str})
 
-    print('Normalizing text')
-    raw['normalized'] = raw.text.apply(lambda x:normalize_text(str(x)))
+    print('Normalizing text...')
+    raw['normalized'] = normalize_text_series(raw.text)
 
     print('Calculating word distribution over industries')
     word_industry = raw.explode('normalized')[['normalized', 'industry']]
@@ -98,7 +100,8 @@ if __name__ == '__main__':
 
     
     print(f'Saving model locally to file: {model_file_name}')
-    with open(model_file_name, 'wb') as model_file:
+    timestamp = str(int(datetime.now().timestamp()))
+    with open(f'model_{timestamp}.sklearn', 'wb') as model_file:
         pickle.dump(regr, model_file)
 
     print('Finished')
