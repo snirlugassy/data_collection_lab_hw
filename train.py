@@ -11,8 +11,11 @@ import gensim.downloader as api
 
 from processing import normalize_text_series
 
+EPOCHS = 100
+CHUNK_SIZE = 25000
+MODEL_FILE_NAME = 'model.sklearn'
+
 labeled_data = sys.argv[1]
-model_file_name = 'model.sklearn'
 
 print('Loading word2vec...')
 word2vec = api.load('word2vec-google-news-300')
@@ -51,57 +54,56 @@ def w2v(w):
 
 if __name__ == '__main__':
     print(f'Reading CSV file {labeled_data}')
-    raw = pd.read_csv(labeled_data, usecols=['text', 'industry'], dtype={'text': str, 'industry':str})
+    try:
+        regr = pickle.load(open(MODEL_FILE_NAME, 'rb'))
+    except FileNotFoundError:
+        regr = MLPRegressor(
+            verbose=True, 
+            hidden_layer_sizes=80, 
+            tol=1e-5, 
+            learning_rate='adaptive'
+        )
 
-    print('Normalizing text...')
-    raw['normalized'] = normalize_text_series(raw.text)
+    for chunk in pd.read_csv(labeled_data, usecols=['text', 'industry'], dtype={'text': str, 'industry':str}, chunksize=CHUNK_SIZE):
+        print('Normalizing text...')
+        chunk['normalized'] = normalize_text_series(chunk.text)
 
-    print('Calculating word distribution over industries')
-    word_industry = raw.explode('normalized')[['normalized', 'industry']]
-    word_industry['lower'] = word_industry['normalized'].apply(lambda x:x.lower())
-    pair_count = word_industry[['industry', 'lower']].value_counts()
-    word_dist = defaultdict(dict)
-    word_count = defaultdict(int)
-    for (ind, w), count in pair_count.iteritems():
-        word_dist[w][ind] = count
-        word_count[w] += count
+        print('Calculating word distribution over industries')
+        word_industry = chunk.explode('normalized')[['normalized', 'industry']]
+        word_industry['lower'] = word_industry['normalized'].apply(lambda x:x.lower())
+        pair_count = word_industry[['industry', 'lower']].value_counts()
+        word_dist = defaultdict(dict)
+        word_count = defaultdict(int)
+        for (ind, w), count in pair_count.iteritems():
+            word_dist[w][ind] = count
+            word_count[w] += count
 
-    word_score = DomainWordScore(word_dist, 90)
-    _data = pd.DataFrame(raw['normalized'].copy().explode('normalized'))
-    _data.rename(columns={'normalized': 'token'}, inplace=True)
-    _data['token_lower'] = _data['token'].apply(lambda x:str(x).lower())
-    _data.drop_duplicates(subset=['token_lower'], inplace=True)
+        word_score = DomainWordScore(word_dist, 90)
+        _data = pd.DataFrame(chunk['normalized'].copy().explode('normalized'))
+        _data.rename(columns={'normalized': 'token'}, inplace=True)
+        _data['token_lower'] = _data['token'].apply(lambda x:str(x).lower())
+        _data.drop_duplicates(subset=['token_lower'], inplace=True)
 
-    print('Scoring training data words')
-    _data['score'] = _data['token_lower'].apply(word_score.score)
+        print('Scoring training data words')
+        _data['score'] = _data['token_lower'].apply(word_score.score)
 
-    print('Embedding word vectors using pre-trained word2vec')
-    _data['word_vec'] = _data['token_lower'].apply(w2v)
+        print('Embedding word vectors using pre-trained word2vec')
+        _data['word_vec'] = _data['token_lower'].apply(w2v)
 
-    print('Ignoring OOV words')
-    _data.dropna(subset=['word_vec'], inplace=True)
+        print('Ignoring OOV words')
+        _data.dropna(subset=['word_vec'], inplace=True)
 
-    X = np.array(_data.word_vec.tolist())
-    y = _data.score
+        X = np.array(_data.word_vec.tolist())
+        y = _data.score
 
-    print('X shape = ', X.shape)
-    print('y shape = ', y.shape)
+        print('X shape = ', X.shape)
+        print('y shape = ', y.shape)
 
-    regr = MLPRegressor(
-        verbose=True, 
-        hidden_layer_sizes=92, 
-        max_iter=300, 
-        tol=1e-5, 
-        learning_rate='adaptive'
-    )
-
-    print('Training...')
-    regr.fit(X,y)
-
-    
-    print(f'Saving model locally to file: {model_file_name}')
-    timestamp = str(int(datetime.now().timestamp()))
-    with open(f'model_{timestamp}.sklearn', 'wb') as model_file:
-        pickle.dump(regr, model_file)
-
-    print('Finished')
+        print('Training...')
+        for i in range(EPOCHS):
+            regr.partial_fit(X,y)
+        
+        print(f'Saving model')
+        # timestamp = str(int(datetime.now().timestamp()))
+        with open(MODEL_FILE_NAME, 'wb') as model_file:
+            pickle.dump(regr, model_file)

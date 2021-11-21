@@ -16,10 +16,7 @@ def tokenize(text):
     tokens = WORD_PATTERN.findall(str(text))
     return [t for t in tokens if (len(t) > 2 or t.lower() not in STOPWORDS)]
 
-# def clean_html(text):
-#     return bsoup(text,'html.parser').get_text()
-
 def normalize_text_series(text:pd.Series):
-    text = text.str.translate(CHAR_FILTER_TABLE).str.lower()
+    text = text.str.translate(CHAR_FILTER_TABLE)
     text = text.apply(tokenize, convert_dtype=False)
     return text
