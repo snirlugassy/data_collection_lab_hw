@@ -25,5 +25,5 @@ def normalize_text(text):
     text = remove_numeric(text)
     tokens = word_tokenize(text)
     tokens = [t for t in tokens if t.lower() not in STOPWORDS]
-    tokens = [t for t in tokens if len(t) > 1]
+    tokens = [t for t in tokens if len(t) > 2]
     return tokens
