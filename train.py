@@ -11,7 +11,7 @@ import gensim.downloader as api
 
 from processing import normalize_text_series
 
-EPOCHS = 100
+EPOCHS = 50
 CHUNK_SIZE = 25000
 MODEL_FILE_NAME = 'model.sklearn'
 
@@ -70,7 +70,7 @@ if __name__ == '__main__':
 
         print('Calculating word distribution over industries')
         word_industry = chunk.explode('normalized')[['normalized', 'industry']]
-        word_industry['lower'] = word_industry['normalized'].apply(lambda x:x.lower())
+        word_industry['lower'] = word_industry['normalized'].apply(lambda x: str(x).lower())
         pair_count = word_industry[['industry', 'lower']].value_counts()
         word_dist = defaultdict(dict)
         word_count = defaultdict(int)
