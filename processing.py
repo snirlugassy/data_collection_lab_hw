@@ -2,11 +2,9 @@ import string
 import re
 import pandas as pd
 import nltk
-# from nltk import word_tokenize
-from bs4 import BeautifulSoup as bsoup
 
-# nltk.download('stopwords')
-# nltk.download('punkt')
+nltk.download('stopwords')
+nltk.download('punkt')
 
 CHAR_FILTER_TABLE = str.maketrans('', '', string.punctuation + '©™–' + '0123456789')
 STOPWORDS = nltk.corpus.stopwords.words('english')

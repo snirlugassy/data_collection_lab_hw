@@ -9,46 +9,65 @@ import numpy as np
 from sklearn.neural_network import MLPRegressor
 import gensim.downloader as api
 
-from processing import normalize_text
+from processing import normalize_text_series
 
 data_file_path = sys.argv[1]
 model_file_path = sys.argv[2]
+
+CHUNK_SIZE = 25000
+
+print('Loading Word2Vec...')
 word2vec = api.load('word2vec-google-news-300')
 
 def w2v(w):
     try:
-        v = word2vec[w]
+        v = word2vec[str(w)]
         return v
     except KeyError:
         return np.nan
 
 
 if __name__ == '__main__':
+    json_output = []
     print('Generating snippets...')
-    data = pd.read_csv(data_file_path, usecols=['id', 'text'])
-    data['normalized'] = data.text.apply(lambda x: normalize_text(str(x)))
-    data = data.explode('normalized')
-    data.rename(columns={'normalized': 'token'}, inplace=True)
-    data['token_lower'] = data['token'].apply(lambda x:str(x).lower())
-    data.drop_duplicates(subset=['id', 'token_lower'], inplace=True)
-    data['word_vec'] = data['token_lower'].apply(w2v)
-    data.dropna(subset=['word_vec'], inplace=True)
-    data.reset_index(drop=True, inplace=True)
+    
+    count = 0
+    for data in pd.read_csv(data_file_path, usecols=['id', 'text'], dtype={'id': np.int64, 'text': str}, chunksize=CHUNK_SIZE):
+        count += 1
+        print('Chunk ', count)
+        
+        print('Normalizing...')
+        data['normalized'] = normalize_text_series(data.text)
+        data = data.explode('normalized')
+        print('Exploded data')
+        data.rename(columns={'normalized': 'token'}, inplace=True)
+        data.drop_duplicates(subset=['id', 'token'], inplace=True)
+        print('Creating word vectors')
+        data['word_vec'] = data['token'].apply(w2v)
+        data.dropna(subset=['word_vec'], inplace=True)
+        data.reset_index(drop=True, inplace=True)
+        print('Normalized')
 
-    with open(model_file_path, 'rb') as model_file:
-        regr = pickle.load(model_file)
+        print('Loading MLP...')
+        with open(model_file_path, 'rb') as model_file:
+            regr = pickle.load(model_file)
 
-    data['score'] = data.word_vec.apply(lambda _v: float(regr.predict(_v.reshape(1,-1))))
-    results = data.groupby(['id'])['score'].nlargest(10)
+        print('Calculating scores')
+        X = np.array(data.word_vec.tolist())
+        data['score'] = regr.predict(X)
+        # data['score'] = data.word_vec.apply(lambda _v: float(regr.predict(_v.reshape(1,-1))))
+        
+        print('Choosing top 10 words')
+        results = data.groupby(['id'])['score'].nlargest(10)
 
-    output = defaultdict(list)
+        output = defaultdict(list)
 
-    for (key, score) in results.items():
-        doc_id = key[0]
-        row_id = key[1]
-        output[doc_id].append(data.iloc[row_id].token)
+        for (key, score) in results.items():
+            doc_id = key[0]
+            row_id = key[1]
+            output[doc_id].append(data.iloc[row_id].token)
 
-    json_output = [{'id':key, 'snippet':tokens} for key, tokens in output.items()]
+        json_output.extend([{'id':key, 'snippet':tokens} for key, tokens in output.items()])
 
     timestamp = str(int(datetime.now().timestamp()))
     with open(f'output_{timestamp}.json', 'w') as output_file:
