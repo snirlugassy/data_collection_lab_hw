@@ -1,4 +1,5 @@
 import pickle
+import sys
 from collections import defaultdict
 
 import pandas as pd
@@ -8,7 +9,7 @@ import gensim.downloader as api
 
 from processing import normalize_text
 
-labeled_data = 'labeled.csv'
+labeled_data = sys.argv[1]
 model_file_name = 'model.sklearn'
 
 print('Loading word2vec...')

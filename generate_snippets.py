@@ -1,5 +1,6 @@
 import pickle
 import json
+from datetime import datetime
 from collections import defaultdict
 
 import pandas as pd
@@ -48,5 +49,6 @@ if __name__ == '__main__':
 
     json_output = [{'id':key, 'snippet':tokens} for key, tokens in output.items()]
 
-    with open('output.json', 'w') as output_file:
+    timestamp = str(int(datetime.now().timestamp()))
+    with open(f'output_{timestamp}.json', 'w') as output_file:
         json.dump(json_output, output_file)
