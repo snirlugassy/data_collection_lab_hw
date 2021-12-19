@@ -1,3 +1,5 @@
+*.pkl
+
 */output*.json
 
 # Data files
