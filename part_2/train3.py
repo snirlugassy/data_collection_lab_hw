@@ -1,18 +1,22 @@
 import random
 import pickle
+
 import pandas as pd
 import numpy as np
-import nltk
-
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.cluster import KMeans
+from sklearn.cluster import KMeans, MiniBatchKMeans
 
+random.seed(42)
 
-nltk.download('stopwords')
-
+# CONFIG
 CHUNK_SIZE = 100000
-STOPWORDS = nltk.corpus.stopwords.words('english')
 VECTORIZER_PICKLE = 'vectorizer.pkl'
+CLUSTERING_PICKLE = 'clustering.pkl'
+INDUSTRIES_LIST = 'industries.txt'
+p = 0.1
+EPOCHS = 20
+VERBOSE = True
+
 
 labeled_data = 'labeled.csv'
 
@@ -22,36 +26,42 @@ data_types = {
 }
 
 print('Loading industries')
-industries = [x.strip() for x in open('industries.txt','r').readlines()]
+industries = [x.strip() for x in open(INDUSTRIES_LIST,'r').readlines()]
 
-print('Reading data')
-data = pd.read_csv(labeled_data, usecols=['text', 'industry'], dtype=data_types, engine='c')
-data.reset_index(drop=True, inplace=True)
-data.text.replace(np.nan, "", inplace=True)
-print(data.info(memory_usage='deep'))
+print('Loading vectorizer')
+vectorizer = pickle.load(open(VECTORIZER_PICKLE, 'rb'))
 
-print('Training TF-IDF Vectorizer')
-corpus = data.text
-vectorizer = TfidfVectorizer()
-X = vectorizer.fit_transform(corpus)
+clustering = MiniBatchKMeans(n_clusters=20)
 
-print('Saving vectorizer to vectorizer.pkl')
-with open("vectorizer.pkl", "wb") as f:
-    pickle.dump(vectorizer, f)
 
-print('Calculating industry means')
-industry_mean = {}
-for i in industries:
-    X_ind = X[data[data['industry']==i].index]
-    _mean = X_ind.mean(axis=0)
-    industry_mean[i] = _mean
+for epoch in range(EPOCHS):
+    print(f'{epoch+1}/{EPOCHS}')
+    
+    print('Reading data')
+    data = pd.read_csv(labeled_data, usecols=['text', 'industry'], dtype=data_types, engine='c', skiprows=lambda i: i>0 and random.random() > p)
+    print('Number of samples texts: ', len(data))
+    
+    data.reset_index(drop=True, inplace=True)
+    data.text.replace(np.nan, "", inplace=True)
 
-means = np.stack([industry_mean[i] for i in industries])
+    print('Loading TF-IDF Vectorizer')
+    corpus = data.text
+    
+    print('Vectorizing texts')
+    X = vectorizer.transform(corpus)
 
-print('Clustering industry means with k=20')
-clustering = KMeans(n_clusters=20)
-clustering.fit(means)
+    print('Calculating industry means')
+    industry_mean = {}
+    for i in industries:
+        X_ind = X[data[data['industry']==i].index]
+        _mean = X_ind.mean(axis=0)
+        industry_mean[i] = _mean
 
-print('Saving clustering to clustering.pkl')
-with open("clustering.pkl", "wb") as f:
-    pickle.dump(clustering, f)
+    means = np.stack([industry_mean[i] for i in industries])
+
+    print('Clustering industry means with k=20')
+    clustering.partial_fit(means)
+
+    print('Saving clustering to clustering.pkl')
+    with open(CLUSTERING_PICKLE, "wb") as f:
+        pickle.dump(clustering, f)
