@@ -10,7 +10,7 @@ from sklearn.cluster import KMeans
 
 nltk.download('stopwords')
 
-CHUNK_SIZE = 100000
+CHUNK_SIZE = 50000
 STOPWORDS = nltk.corpus.stopwords.words('english')
 VECTORIZER_PICKLE = 'vectorizer.pkl'
 
@@ -34,7 +34,7 @@ data.reset_index(drop=True, inplace=True)
 
 print('Replacing NaN text')
 data.text.replace(np.nan, "", inplace=True)
-print(data.info(memory_usage='deep'))
+# print(data.info(memory_usage='deep'))
 
 corpus = data.text
 

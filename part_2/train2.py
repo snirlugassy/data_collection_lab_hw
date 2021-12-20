@@ -10,7 +10,7 @@ from sklearn.cluster import KMeans, MiniBatchKMeans
 
 nltk.download('stopwords')
 
-CHUNK_SIZE = 100000
+CHUNK_SIZE = 150000
 STOPWORDS = nltk.corpus.stopwords.words('english')
 VECTORIZER_PICKLE = 'vectorizer.pkl'
 
