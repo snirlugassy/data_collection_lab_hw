@@ -31,6 +31,7 @@ industries = [x.strip() for x in open('industries.txt','r').readlines()]
 industry_mean = {}
 industry_size = {}
 iter = 0
+EPOCHS = 20
 clustering = MiniBatchKMeans(n_clusters=20)
 
 for chunk in pd.read_csv(labeled_data, usecols=['text', 'industry'], dtype=data_types, engine='c', chunksize=CHUNK_SIZE):
